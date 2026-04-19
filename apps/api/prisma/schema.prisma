@@ -1,0 +1,770 @@
+// Rastera Health — Database Schema
+// PostgreSQL via Prisma ORM
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth & Identity ──────────────────────────────────────────────────────────
+
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  passwordHash      String
+  role              UserRole  @default(PATIENT)
+  firstName         String
+  lastName          String
+  phone             String?
+  isEmailVerified   Boolean   @default(false)
+  isActive          Boolean   @default(true)
+  lastLoginAt       DateTime?
+  mfaEnabled        Boolean   @default(false)
+  mfaSecret         String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  patient           PatientProfile?
+  careTeamMember    CareTeamMember?
+  sentMessages      CareMessage[]     @relation("MessageAuthor")
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+  sessions          UserSession[]
+
+  @@index([email])
+  @@map("users")
+}
+
+model UserSession {
+  id           String   @id @default(cuid())
+  userId       String
+  tokenHash    String   @unique
+  deviceInfo   String?
+  ipAddress    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("user_sessions")
+}
+
+// ─── Patient Domain ───────────────────────────────────────────────────────────
+
+model PatientProfile {
+  id                   String             @id @default(cuid())
+  userId               String             @unique
+  mrn                  String?            @unique // Medical Record Number (EHR link)
+  dischargeDate        DateTime
+  admissionDate        DateTime?
+  primaryCondition     Condition
+  riskScore            Float              @default(0) // 0–100 readmission risk
+  engagementLevel      EngagementLevel    @default(MEDIUM)
+  preferredLanguage    String             @default("en")
+  dateOfBirth          DateTime?
+  gender               String?
+  zipCode              String?            // for SDOH analysis
+  insuranceType        String?
+  facilityId           String?
+  careTeamId           String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  // Relations
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  facility             Facility?          @relation(fields: [facilityId], references: [id])
+  careTeam             CareTeam?          @relation(fields: [careTeamId], references: [id])
+  comorbidities        PatientCondition[]
+  medications          Medication[]
+  learningPlan         LearningPlan?
+  progress             PatientProgress[]
+  alerts               Alert[]
+  messages             CareMessage[]      @relation("PatientMessages")
+  chatSessions         ChatSession[]
+  vitalLogs            VitalLog[]
+  symptomLogs          SymptomLog[]
+  analytics            PatientAnalyticsSnapshot[]
+  accessibilityConfig  AccessibilityConfig?
+  notifications        Notification[]     @relation("PatientNotifications")
+
+  @@index([userId])
+  @@index([primaryCondition])
+  @@index([engagementLevel])
+  @@index([dischargeDate])
+  @@map("patient_profiles")
+}
+
+model PatientCondition {
+  id          String         @id @default(cuid())
+  patientId   String
+  condition   Condition
+  isPrimary   Boolean        @default(false)
+  diagnosedAt DateTime?
+  notes       String?
+  createdAt   DateTime       @default(now())
+
+  patient     PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@unique([patientId, condition])
+  @@index([patientId])
+  @@map("patient_conditions")
+}
+
+model Medication {
+  id            String         @id @default(cuid())
+  patientId     String
+  name          String
+  genericName   String?
+  dosage        String
+  frequency     String
+  route         String?        // oral, IV, inhaled, etc.
+  instructions  String?
+  startDate     DateTime
+  endDate       DateTime?
+  prescribedBy  String?
+  isActive      Boolean        @default(true)
+  rxNormCode    String?        // standardized drug code
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  patient       PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@map("medications")
+}
+
+model AccessibilityConfig {
+  id                   String         @id @default(cuid())
+  patientId            String         @unique
+  largeText            Boolean        @default(false)
+  highContrast         Boolean        @default(false)
+  screenReader         Boolean        @default(false)
+  simplifiedLanguage   Boolean        @default(false)
+  preferredMediaType   MediaType      @default(VIDEO)
+  captionsEnabled      Boolean        @default(true)
+  updatedAt            DateTime       @updatedAt
+
+  patient              PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("accessibility_configs")
+}
+
+// ─── Care Team ────────────────────────────────────────────────────────────────
+
+model CareTeam {
+  id        String           @id @default(cuid())
+  name      String
+  facilityId String?
+  createdAt DateTime         @default(now())
+
+  facility  Facility?        @relation(fields: [facilityId], references: [id])
+  members   CareTeamMember[]
+  patients  PatientProfile[]
+
+  @@map("care_teams")
+}
+
+model CareTeamMember {
+  id         String    @id @default(cuid())
+  userId     String    @unique
+  careTeamId String
+  title      String?   // "RN", "MD", "Care Coordinator"
+  specialty  String?
+  createdAt  DateTime  @default(now())
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  careTeam   CareTeam  @relation(fields: [careTeamId], references: [id])
+
+  @@map("care_team_members")
+}
+
+model Facility {
+  id         String           @id @default(cuid())
+  name       String
+  npi        String?          @unique // National Provider Identifier
+  address    String?
+  city       String?
+  state      String?
+  zipCode    String?
+  fhirBaseUrl String?         // EHR/FHIR integration endpoint
+  isActive   Boolean          @default(true)
+  createdAt  DateTime         @default(now())
+
+  patients   PatientProfile[]
+  careTeams  CareTeam[]
+  modules    LearningModule[] @relation("FacilityModules")
+
+  @@map("facilities")
+}
+
+// ─── Learning Content ─────────────────────────────────────────────────────────
+
+model LearningModule {
+  id                   String          @id @default(cuid())
+  slug                 String          @unique
+  title                String
+  description          String
+  type                 ModuleType
+  estimatedMinutes     Int             @default(5)
+  daysPostDischarge    Int             // when to first deliver
+  refreshIntervalDays  Int?            // for reinforcement modules
+  difficulty           Int             @default(1) // 1-5
+  isActive             Boolean         @default(true)
+  isAIGenerated        Boolean         @default(false)
+  aiGeneratedSummary   String?
+  thumbnailUrl         String?
+  facilityId           String?         // null = global module
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  // Relations
+  facility             Facility?       @relation("FacilityModules", fields: [facilityId], references: [id])
+  targetConditions     ModuleCondition[]
+  contentBlocks        ContentBlock[]
+  exercises            Exercise[]
+  branchingRules       BranchingRule[]
+  prerequisites        ModulePrerequisite[] @relation("ModulePrereqs")
+  requiredBy           ModulePrerequisite[] @relation("PrereqOf")
+  scheduledModules     ScheduledModule[]
+  progress             PatientProgress[]
+
+  @@index([type])
+  @@index([daysPostDischarge])
+  @@map("learning_modules")
+}
+
+model ModuleCondition {
+  id         String         @id @default(cuid())
+  moduleId   String
+  condition  Condition
+  isPrimary  Boolean        @default(false)
+
+  module     LearningModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([moduleId, condition])
+  @@map("module_conditions")
+}
+
+model ModulePrerequisite {
+  id             String         @id @default(cuid())
+  moduleId       String
+  prerequisiteId String
+
+  module         LearningModule @relation("ModulePrereqs", fields: [moduleId], references: [id], onDelete: Cascade)
+  prerequisite   LearningModule @relation("PrereqOf", fields: [prerequisiteId], references: [id], onDelete: Cascade)
+
+  @@unique([moduleId, prerequisiteId])
+  @@map("module_prerequisites")
+}
+
+model ContentBlock {
+  id              String         @id @default(cuid())
+  moduleId        String
+  order           Int
+  type            ContentType
+  title           String
+  content         String         // URL or markdown text
+  durationSeconds Int?
+  transcript      String?
+  altText         String?
+  thumbnailUrl    String?
+  aiGeneratedAt   DateTime?      // if content was AI-generated
+  createdAt       DateTime       @default(now())
+
+  module          LearningModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@index([moduleId])
+  @@map("content_blocks")
+}
+
+model Exercise {
+  id               String           @id @default(cuid())
+  moduleId         String
+  order            Int
+  type             ExerciseType
+  prompt           String
+  passingScore     Int?             // for scored exercises (0-100)
+  maxScore         Int?
+  failureAction    FailureAction    @default(REPEAT)
+  failureBranchId  String?          // moduleId to branch to on failure
+  createdAt        DateTime         @default(now())
+
+  module           LearningModule   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  options          ExerciseOption[]
+  responses        ExerciseResponse[]
+  branchingRules   BranchingRule[]
+
+  @@index([moduleId])
+  @@map("exercises")
+}
+
+model ExerciseOption {
+  id               String     @id @default(cuid())
+  exerciseId       String
+  text             String
+  value            String
+  isCorrect        Boolean    @default(false)
+  feedback         String?
+  nextModuleId     String?    // for branching
+
+  exercise         Exercise   @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@index([exerciseId])
+  @@map("exercise_options")
+}
+
+model BranchingRule {
+  id               String           @id @default(cuid())
+  moduleId         String
+  exerciseId       String?
+  priority         Int              @default(0)
+  conditionType    BranchConditionType
+  conditionOperator BranchOperator
+  conditionValue   String           // JSON string for complex values
+  actionType       BranchActionType
+  targetModuleId   String?
+  alertMessage     String?
+  createdAt        DateTime         @default(now())
+
+  module           LearningModule   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  exercise         Exercise?        @relation(fields: [exerciseId], references: [id])
+
+  @@index([moduleId])
+  @@map("branching_rules")
+}
+
+// ─── Learning Plans & Progress ────────────────────────────────────────────────
+
+model LearningPlan {
+  id               String            @id @default(cuid())
+  patientId        String            @unique
+  generatedAt      DateTime          @default(now())
+  lastAdaptedAt    DateTime          @default(now())
+  adaptationCount  Int               @default(0)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  patient          PatientProfile    @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  scheduledModules ScheduledModule[]
+  adaptationEvents AdaptationEvent[]
+
+  @@map("learning_plans")
+}
+
+model ScheduledModule {
+  id                  String         @id @default(cuid())
+  planId              String
+  moduleId            String
+  scheduledDate       DateTime
+  actualDeliveryDate  DateTime?
+  status              ModuleStatus   @default(LOCKED)
+  isAdaptive          Boolean        @default(false)
+  adaptationReason    String?
+  order               Int
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  plan                LearningPlan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  module              LearningModule @relation(fields: [moduleId], references: [id])
+
+  @@index([planId])
+  @@index([scheduledDate])
+  @@map("scheduled_modules")
+}
+
+model AdaptationEvent {
+  id             String       @id @default(cuid())
+  planId         String
+  trigger        String
+  modulesAdded   String[]     // module IDs
+  modulesRemoved String[]     // module IDs
+  explanation    String
+  createdAt      DateTime     @default(now())
+
+  plan           LearningPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId])
+  @@map("adaptation_events")
+}
+
+model PatientProgress {
+  id                String             @id @default(cuid())
+  patientId         String
+  moduleId          String
+  status            ModuleStatus       @default(LOCKED)
+  startedAt         DateTime?
+  completedAt       DateTime?
+  score             Float?             // 0-100
+  timeSpentSeconds  Int                @default(0)
+  engagementScore   Float              @default(0) // 0-100
+  attemptCount      Int                @default(0)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  patient           PatientProfile     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  module            LearningModule     @relation(fields: [moduleId], references: [id])
+  responses         ExerciseResponse[]
+
+  @@unique([patientId, moduleId])
+  @@index([patientId])
+  @@index([status])
+  @@map("patient_progress")
+}
+
+model ExerciseResponse {
+  id                 String          @id @default(cuid())
+  progressId         String
+  exerciseId         String
+  selectedOptionId   String?
+  freeTextResponse   String?
+  numericValue       Float?
+  score              Float?
+  respondedAt        DateTime        @default(now())
+
+  progress           PatientProgress @relation(fields: [progressId], references: [id], onDelete: Cascade)
+  exercise           Exercise        @relation(fields: [exerciseId], references: [id])
+
+  @@index([progressId])
+  @@index([exerciseId])
+  @@map("exercise_responses")
+}
+
+// ─── Clinical Monitoring ──────────────────────────────────────────────────────
+
+model VitalLog {
+  id           String         @id @default(cuid())
+  patientId    String
+  type         VitalType
+  value        Float
+  unit         String
+  isAbnormal   Boolean        @default(false)
+  notes        String?
+  loggedAt     DateTime       @default(now())
+  source       VitalSource    @default(PATIENT_ENTERED)
+
+  patient      PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([loggedAt])
+  @@map("vital_logs")
+}
+
+model SymptomLog {
+  id           String         @id @default(cuid())
+  patientId    String
+  symptom      String
+  severity     Int            // 1-10
+  notes        String?
+  loggedAt     DateTime       @default(now())
+  escalated    Boolean        @default(false)
+
+  patient      PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([loggedAt])
+  @@map("symptom_logs")
+}
+
+model Alert {
+  id               String         @id @default(cuid())
+  patientId        String
+  severity         AlertSeverity
+  type             AlertType
+  message          String
+  isAcknowledged   Boolean        @default(false)
+  acknowledgedBy   String?
+  acknowledgedAt   DateTime?
+  autoGenerated    Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+
+  patient          PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([severity])
+  @@index([isAcknowledged])
+  @@map("alerts")
+}
+
+// ─── Communication ────────────────────────────────────────────────────────────
+
+model CareMessage {
+  id          String         @id @default(cuid())
+  patientId   String
+  authorId    String
+  threadId    String
+  content     String
+  isRead      Boolean        @default(false)
+  readAt      DateTime?
+  attachments String[]
+  createdAt   DateTime       @default(now())
+
+  patient     PatientProfile @relation("PatientMessages", fields: [patientId], references: [id], onDelete: Cascade)
+  author      User           @relation("MessageAuthor", fields: [authorId], references: [id])
+
+  @@index([patientId])
+  @@index([threadId])
+  @@map("care_messages")
+}
+
+model ChatSession {
+  id          String         @id @default(cuid())
+  patientId   String
+  summary     String?
+  isActive    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  patient     PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  messages    ChatMessage[]
+
+  @@index([patientId])
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id          String      @id @default(cuid())
+  sessionId   String
+  role        ChatRole
+  content     String
+  tokens      Int?
+  createdAt   DateTime    @default(now())
+
+  session     ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("chat_messages")
+}
+
+model Notification {
+  id          String               @id @default(cuid())
+  userId      String
+  patientId   String?
+  type        NotificationType
+  channel     NotificationChannel
+  title       String
+  body        String
+  data        Json?
+  isSent      Boolean              @default(false)
+  sentAt      DateTime?
+  isRead      Boolean              @default(false)
+  readAt      DateTime?
+  scheduledAt DateTime?
+  createdAt   DateTime             @default(now())
+
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  patient     PatientProfile?      @relation("PatientNotifications", fields: [patientId], references: [id])
+
+  @@index([userId])
+  @@index([scheduledAt])
+  @@map("notifications")
+}
+
+// ─── Analytics ────────────────────────────────────────────────────────────────
+
+model PatientAnalyticsSnapshot {
+  id                        String         @id @default(cuid())
+  patientId                 String
+  snapshotDate              DateTime       @default(now())
+  moduleCompletionRate      Float          @default(0)
+  averageScore              Float          @default(0)
+  totalEngagementMinutes    Float          @default(0)
+  streakDays                Int            @default(0)
+  engagementTrend           EngagementTrend @default(STABLE)
+  predictedReadmissionRisk  Float          @default(0)
+  alertCount                Int            @default(0)
+  lastActiveAt              DateTime?
+
+  patient                   PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([snapshotDate])
+  @@map("patient_analytics_snapshots")
+}
+
+// ─── Audit & Compliance (HIPAA) ───────────────────────────────────────────────
+
+model AuditLog {
+  id           String    @id @default(cuid())
+  userId       String?
+  action       String    // "READ_PATIENT", "UPDATE_MEDICATION", etc.
+  resourceType String
+  resourceId   String?
+  ipAddress    String?
+  userAgent    String?
+  details      Json?
+  createdAt    DateTime  @default(now())
+
+  user         User?     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([resourceType, resourceId])
+  @@map("audit_logs")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  PATIENT
+  CARE_COORDINATOR
+  CLINICIAN
+  ADMIN
+}
+
+enum Condition {
+  HEART_FAILURE
+  COPD
+  AMI
+  CABG
+  KIDNEY_DISEASE
+  PNEUMONIA
+  DIABETES
+  HYPERTENSION
+  ATRIAL_FIBRILLATION
+  STROKE
+}
+
+enum ModuleType {
+  CORE_CONDITION
+  SELF_MONITORING
+  COMORBIDITY
+  POLYPHARMACY
+  SOCIAL_DETERMINANTS
+  REINFORCEMENT
+}
+
+enum ModuleStatus {
+  LOCKED
+  AVAILABLE
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+enum EngagementLevel {
+  HIGH
+  MEDIUM
+  LOW
+  AT_RISK
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AlertType {
+  SYMPTOM
+  ENGAGEMENT
+  MEDICATION
+  VITAL
+  MISSED_MODULE
+}
+
+enum ContentType {
+  VIDEO
+  TEXT
+  INFOGRAPHIC
+  ANIMATION
+}
+
+enum ExerciseType {
+  QUIZ
+  CHECKIN
+  SYMPTOM_LOG
+  VITAL_LOG
+  REFLECTION
+}
+
+enum FailureAction {
+  REPEAT
+  BRANCH
+  ESCALATE
+}
+
+enum BranchConditionType {
+  SCORE
+  RESPONSE
+  ENGAGEMENT
+  CONDITION
+  DAYS_POST_DISCHARGE
+}
+
+enum BranchOperator {
+  GT
+  LT
+  EQ
+  GTE
+  LTE
+  IN
+}
+
+enum BranchActionType {
+  UNLOCK_MODULE
+  SKIP_MODULE
+  ADD_MODULE
+  ESCALATE_TO_CARE_TEAM
+  SEND_ALERT
+}
+
+enum VitalType {
+  WEIGHT
+  BLOOD_PRESSURE_SYSTOLIC
+  BLOOD_PRESSURE_DIASTOLIC
+  HEART_RATE
+  OXYGEN_SATURATION
+  TEMPERATURE
+  BLOOD_GLUCOSE
+  RESPIRATORY_RATE
+}
+
+enum VitalSource {
+  PATIENT_ENTERED
+  DEVICE_SYNC
+  CARE_TEAM
+  EHR_IMPORT
+}
+
+enum MediaType {
+  VIDEO
+  AUDIO
+  TEXT
+}
+
+enum ChatRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum NotificationType {
+  MODULE_AVAILABLE
+  MODULE_REMINDER
+  QUIZ_RESULT
+  ALERT
+  MESSAGE
+  VITAL_REMINDER
+  STREAK_MILESTONE
+}
+
+enum NotificationChannel {
+  PUSH
+  SMS
+  EMAIL
+  IN_APP
+}
+
+enum EngagementTrend {
+  IMPROVING
+  STABLE
+  DECLINING
+}
