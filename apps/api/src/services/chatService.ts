@@ -119,7 +119,7 @@ Patient Context (for your reference only, do not repeat to patient):
             text: CHAT_SYSTEM_PROMPT + '\n\n' + patientContext,
             cache_control: { type: 'ephemeral' }, // Cache system prompt per session
           },
-        ],
+        ] as any,
         messages: [
           ...history,
           { role: 'user', content: userMessage },

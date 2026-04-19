@@ -210,7 +210,7 @@ Return JSON array: [{ "moduleId": "...", "reason": "...", "confidenceScore": 0.0
             text: SYSTEM_PROMPT,
             cache_control: { type: 'ephemeral' },
           },
-        ],
+        ] as any,
         messages: [
           {
             role: 'user',
@@ -279,7 +279,7 @@ Return only JSON: { "riskScore": 0-100, "primaryFactors": ["factor1", "factor2"]
             text: SYSTEM_PROMPT,
             cache_control: { type: 'ephemeral' },
           },
-        ],
+        ] as any,
         messages: [
           {
             role: 'user',

@@ -624,6 +624,7 @@ export class LearningPlanEngine {
           patientId,
           escalationType: escalationType as any,
           hoursInactive,
+          actionTaken: config.message,
         },
       }),
     ]);

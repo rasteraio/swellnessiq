@@ -118,7 +118,7 @@ router.post('/', requireRole('ADMIN', 'CLINICIAN'), async (req: AuthRequest, res
       slug: z.string(),
       title: z.string(),
       description: z.string(),
-      type: z.enum(['CORE_CONDITION', 'SELF_MONITORING', 'COMORBIDITY', 'POLYPHARMACY', 'SOCIAL_DETERMINANTS', 'REINFORCEMENT']),
+      type: z.enum(['CORE_CONDITION', 'SELF_MONITORING', 'BRANCHING', 'POLYPHARMACY', 'SOCIAL_DETERMINANTS', 'REINFORCEMENT', 'PLATFORM_FUNDAMENTALS']),
       estimatedMinutes: z.number().default(5),
       daysPostDischarge: z.number(),
       difficulty: z.number().min(1).max(5).default(1),

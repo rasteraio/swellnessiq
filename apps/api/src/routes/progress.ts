@@ -83,7 +83,7 @@ router.post('/:moduleId/complete', async (req: AuthRequest, res: Response, next:
         }
       }
 
-      exerciseResponses.push({ exerciseId: response.exerciseId, ...response });
+      exerciseResponses.push({ ...response });
     }
 
     const score = totalPoints > 0 ? (earnedPoints / totalPoints) * 100 : null;
@@ -145,7 +145,7 @@ router.post('/:moduleId/complete', async (req: AuthRequest, res: Response, next:
       data: {
         progress,
         score,
-        passed: score === null || score >= (module.exercises[0]?.passingScore || 70),
+        passed: score === null || score >= (module.exercises[0]?.masteryThreshold || 80),
         feedback: score !== null
           ? score >= 80 ? 'Excellent work!' : score >= 60 ? 'Good effort! Review the key points.' : 'Keep practicing — a refresher module has been added to your plan.'
           : 'Module completed!',

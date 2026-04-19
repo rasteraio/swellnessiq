@@ -28,7 +28,7 @@ export class NotificationService {
         channel: payload.channel as any,
         title: payload.title,
         body: payload.body,
-        data: payload.data || {},
+        data: (payload.data || {}) as any,
         scheduledAt: payload.scheduledAt || new Date(),
       },
     });

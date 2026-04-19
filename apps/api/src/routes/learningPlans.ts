@@ -24,7 +24,7 @@ router.get('/:patientId', requirePatientAccess(), async (req: AuthRequest, res: 
             module: {
               select: {
                 id: true, title: true, type: true, description: true,
-                estimatedMinutes: true, thumbnailUrl: true, difficulty: true,
+                estimatedMinutes: true, difficulty: true,
               },
             },
           },
