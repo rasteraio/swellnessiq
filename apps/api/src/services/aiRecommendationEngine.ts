@@ -204,13 +204,7 @@ Return JSON array: [{ "moduleId": "...", "reason": "...", "confidenceScore": 0.0
       const response = await anthropic.messages.create({
         model: 'claude-opus-4-6',
         max_tokens: 256,
-        system: [
-          {
-            type: 'text',
-            text: SYSTEM_PROMPT,
-            cache_control: { type: 'ephemeral' },
-          },
-        ] as any,
+        system: SYSTEM_PROMPT,
         messages: [
           {
             role: 'user',
@@ -273,13 +267,7 @@ Return only JSON: { "riskScore": 0-100, "primaryFactors": ["factor1", "factor2"]
       const response = await anthropic.messages.create({
         model: 'claude-opus-4-6',
         max_tokens: 2048,
-        system: [
-          {
-            type: 'text',
-            text: SYSTEM_PROMPT,
-            cache_control: { type: 'ephemeral' },
-          },
-        ] as any,
+        system: SYSTEM_PROMPT,
         messages: [
           {
             role: 'user',

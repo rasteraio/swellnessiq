@@ -113,13 +113,7 @@ Patient Context (for your reference only, do not repeat to patient):
       const response = await anthropic.messages.create({
         model: 'claude-opus-4-6',
         max_tokens: 512,
-        system: [
-          {
-            type: 'text',
-            text: CHAT_SYSTEM_PROMPT + '\n\n' + patientContext,
-            cache_control: { type: 'ephemeral' }, // Cache system prompt per session
-          },
-        ] as any,
+        system: CHAT_SYSTEM_PROMPT + '\n\n' + patientContext,
         messages: [
           ...history,
           { role: 'user', content: userMessage },
