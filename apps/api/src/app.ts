@@ -25,6 +25,12 @@ import adminRoutes from './routes/admin';
 
 const app = express();
 
+// ─── Health Check (before all middleware — must always respond) ───────────────
+
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '1.0.0' });
+});
+
 // ─── Security Middleware ──────────────────────────────────────────────────────
 
 app.use(helmet({
@@ -73,12 +79,6 @@ app.use(express.urlencoded({ extended: true }));
 app.use(requestId);
 app.use(morgan('combined'));
 app.use(auditLogger);
-
-// ─── Health Check ─────────────────────────────────────────────────────────────
-
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '1.0.0' });
-});
 
 // ─── API Routes ───────────────────────────────────────────────────────────────
 

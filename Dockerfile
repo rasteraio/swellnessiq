@@ -46,9 +46,7 @@ COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY apps/api/prisma ./apps/api/prisma
 RUN cd apps/api && npx prisma generate
 
-COPY apps/api/entrypoint.sh ./apps/api/entrypoint.sh
-RUN chmod +x ./apps/api/entrypoint.sh
-
 EXPOSE 3001
 
-CMD ["/app/apps/api/entrypoint.sh"]
+# Run prisma db push in background so the server binds the port immediately
+CMD ["sh", "-c", "cd /app/apps/api && npx prisma db push --accept-data-loss & exec node dist/index.js"]
