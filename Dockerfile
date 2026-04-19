@@ -39,13 +39,12 @@ RUN npm install --workspace=apps/api --workspace=packages/shared --omit=dev
 # Shared built output
 COPY --from=build /app/packages/shared/dist ./packages/shared/dist
 
-# API built output + generated Prisma client
+# API built output
 COPY --from=build /app/apps/api/dist ./apps/api/dist
-COPY --from=build /app/apps/api/node_modules/.prisma ./apps/api/node_modules/.prisma
-COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 
-# Prisma schema (needed for migrate/push at runtime)
+# Prisma schema + re-generate client in runner (works regardless of workspace layout)
 COPY apps/api/prisma ./apps/api/prisma
+RUN cd apps/api && npx prisma generate
 
 EXPOSE 3001
 
