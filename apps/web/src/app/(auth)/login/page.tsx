@@ -9,7 +9,7 @@ import { useAuthStore } from '../../../stores/authStore';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuthStore();
+  const { login, enterDemo } = useAuthStore();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -117,7 +117,28 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p className="text-center text-slate-500 text-sm mt-6">
+          <div className="relative my-5">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-200" />
+            </div>
+            <div className="relative flex justify-center">
+              <span className="px-3 bg-white text-slate-400 text-sm">or</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => { enterDemo(); router.push('/dashboard'); }}
+            className="btn-secondary w-full text-base"
+          >
+            Try Demo
+          </button>
+
+          <p className="text-center text-slate-400 text-xs mt-4">
+            Demo uses sample patient data — no account needed
+          </p>
+
+          <p className="text-center text-slate-500 text-sm mt-4">
             Need help?{' '}
             <Link href="/support" className="text-blue-600 hover:underline font-medium">
               Contact your care team

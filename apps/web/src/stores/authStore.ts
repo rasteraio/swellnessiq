@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { DEMO_MODE_KEY } from '../lib/api';
+import { DEMO_USER } from '../lib/demoData';
 
 interface User {
   id: string;
@@ -19,6 +21,7 @@ interface AuthState {
   logout: () => void;
   setAccessToken: (token: string) => void;
   setUser: (user: User) => void;
+  enterDemo: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -30,8 +33,14 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       login: (accessToken, refreshToken, user) =>
         set({ accessToken, refreshToken, user, isAuthenticated: true }),
-      logout: () =>
-        set({ accessToken: null, refreshToken: null, user: null, isAuthenticated: false }),
+      logout: () => {
+        if (typeof window !== 'undefined') sessionStorage.removeItem(DEMO_MODE_KEY);
+        set({ accessToken: null, refreshToken: null, user: null, isAuthenticated: false });
+      },
+      enterDemo: () => {
+        if (typeof window !== 'undefined') sessionStorage.setItem(DEMO_MODE_KEY, '1');
+        set({ accessToken: 'demo-token', refreshToken: 'demo-refresh', user: DEMO_USER as User, isAuthenticated: true });
+      },
       setAccessToken: (accessToken) => set({ accessToken }),
       setUser: (user) => set({ user }),
     }),
