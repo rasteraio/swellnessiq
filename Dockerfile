@@ -8,16 +8,23 @@ COPY apps/api/package.json ./apps/api/
 COPY packages/shared/package.json ./packages/shared/
 RUN npm install --workspace=apps/api --workspace=packages/shared
 
-# ── Build shared types package ────────────────────────────────────────────────
+# ── Build stage ───────────────────────────────────────────────────────────────
 FROM deps AS build
+
+# Build shared types first
 COPY packages/shared ./packages/shared
 RUN npm run build --workspace=packages/shared
 
-# Copy and build API
+# Copy API source + Prisma schema
 COPY apps/api ./apps/api
+
+# Generate Prisma client BEFORE tsc so the types are available for compilation
+RUN cd apps/api && npx prisma generate
+
+# Now compile the API
 RUN npm run build --workspace=apps/api
 
-# ── Production image ─────────────────────────────────────────────────────────
+# ── Production image ──────────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
 WORKDIR /app
 
@@ -29,13 +36,16 @@ COPY apps/api/package.json ./apps/api/
 COPY packages/shared/package.json ./packages/shared/
 RUN npm install --workspace=apps/api --workspace=packages/shared --omit=dev
 
-# Built output
+# Shared built output
 COPY --from=build /app/packages/shared/dist ./packages/shared/dist
-COPY --from=build /app/apps/api/dist ./apps/api/dist
 
-# Prisma schema (needed for client generation + migrate deploy)
+# API built output + generated Prisma client
+COPY --from=build /app/apps/api/dist ./apps/api/dist
+COPY --from=build /app/apps/api/node_modules/.prisma ./apps/api/node_modules/.prisma
+COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
+
+# Prisma schema (needed for migrate/push at runtime)
 COPY apps/api/prisma ./apps/api/prisma
-RUN cd apps/api && npx prisma generate
 
 EXPOSE 3001
 
