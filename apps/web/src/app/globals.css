@@ -4,35 +4,30 @@
 
 @layer base {
   :root {
-    --color-primary: 37 99 235;        /* blue-600 */
-    --color-primary-dark: 29 78 216;   /* blue-700 */
-    --color-success: 22 163 74;        /* green-600 */
-    --color-warning: 234 179 8;        /* yellow-500 */
-    --color-danger: 220 38 38;         /* red-600 */
+    --color-primary: 8 145 178;        /* cyan-600  */
+    --color-primary-dark: 14 116 144;  /* cyan-700  */
+    --color-success: 5 150 105;        /* emerald-600 */
+    --color-warning: 217 119 6;        /* amber-600 */
+    --color-danger: 220 38 38;         /* red-600   */
   }
 
-  /* Accessibility: respect user font-size preference */
   html {
-    font-size: clamp(16px, 2vw, 18px);
+    font-size: clamp(15px, 2vw, 17px);
   }
 
-  /* Large text mode */
   html[data-large-text="true"] {
     font-size: clamp(18px, 2.2vw, 22px);
   }
 
-  /* High contrast mode */
   html[data-high-contrast="true"] {
-    --color-primary: 0 0 180;
+    --color-primary: 0 100 140;
     filter: contrast(1.2);
   }
 
-  /* Focus visible for keyboard navigation */
   *:focus-visible {
-    @apply outline-none ring-2 ring-blue-500 ring-offset-2;
+    @apply outline-none ring-2 ring-cyan-500 ring-offset-2;
   }
 
-  /* Touch target minimum size (WCAG 2.5.5) */
   button, a, [role="button"] {
     min-height: 44px;
     min-width: 44px;
@@ -40,28 +35,52 @@
 }
 
 @layer components {
+  /* ── Cards ───────────────────────────────────────────────────────────────── */
   .card {
-    @apply bg-white rounded-2xl shadow-sm border border-slate-100 p-5;
+    @apply bg-white rounded-2xl shadow-card border border-slate-100 p-5;
   }
 
+  .card-flat {
+    @apply bg-white rounded-2xl border border-slate-100 p-5;
+  }
+
+  /* ── Buttons ─────────────────────────────────────────────────────────────── */
   .btn-primary {
-    @apply bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold
+    @apply bg-cyan-600 hover:bg-cyan-700 active:bg-cyan-800 text-white font-semibold
            rounded-xl px-6 py-3 transition-colors duration-150 disabled:opacity-50
            disabled:cursor-not-allowed flex items-center justify-center gap-2;
   }
 
   .btn-secondary {
     @apply bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold
-           rounded-xl px-6 py-3 transition-colors duration-150;
+           rounded-xl px-6 py-3 transition-colors duration-150 flex items-center justify-center gap-2;
   }
 
+  .btn-ghost {
+    @apply text-cyan-600 hover:bg-cyan-50 font-semibold rounded-xl px-4 py-2
+           transition-colors duration-150 flex items-center justify-center gap-2;
+  }
+
+  /* ── Badges ──────────────────────────────────────────────────────────────── */
   .badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
   }
 
-  .badge-blue   { @apply badge bg-blue-100 text-blue-800; }
-  .badge-green  { @apply badge bg-green-100 text-green-800; }
-  .badge-yellow { @apply badge bg-yellow-100 text-yellow-800; }
-  .badge-red    { @apply badge bg-red-100 text-red-800; }
-  .badge-gray   { @apply badge bg-slate-100 text-slate-600; }
+  .badge-blue   { @apply badge bg-cyan-50 text-cyan-700 border border-cyan-200; }
+  .badge-green  { @apply badge bg-emerald-50 text-emerald-700 border border-emerald-200; }
+  .badge-yellow { @apply badge bg-amber-50 text-amber-700 border border-amber-200; }
+  .badge-red    { @apply badge bg-red-50 text-red-700 border border-red-200; }
+  .badge-gray   { @apply badge bg-slate-100 text-slate-600 border border-slate-200; }
+
+  /* ── Form inputs ─────────────────────────────────────────────────────────── */
+  .input {
+    @apply w-full px-4 py-3 rounded-xl border border-slate-200 bg-white
+           focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100 outline-none
+           transition text-slate-800 text-base placeholder:text-slate-400;
+  }
+
+  /* ── Section label ───────────────────────────────────────────────────────── */
+  .section-label {
+    @apply text-xs font-semibold text-slate-400 uppercase tracking-widest;
+  }
 }

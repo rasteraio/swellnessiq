@@ -10,11 +10,11 @@ const config: Config = {
     extend: {
       colors: {
         primary: {
-          50: '#EFF6FF',
-          100: '#DBEAFE',
-          500: '#3B82F6',
-          600: '#2563EB',
-          700: '#1D4ED8',
+          50:  '#ECFEFF',
+          100: '#CFFAFE',
+          500: '#06B6D4',
+          600: '#0891B2',
+          700: '#0E7490',
         },
       },
       fontFamily: {
@@ -24,12 +24,22 @@ const config: Config = {
         '2xl': '1rem',
         '3xl': '1.5rem',
       },
+      boxShadow: {
+        card: '0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.06)',
+        'card-lg': '0 4px 6px rgba(0,0,0,0.04), 0 10px 30px rgba(0,0,0,0.08)',
+        'inner-sm': 'inset 0 1px 3px rgba(0,0,0,0.08)',
+      },
       animation: {
-        'in': 'fadeIn 0.2s ease-out',
+        'fade-in': 'fadeIn 0.25s ease-out',
+        'slide-up': 'slideUp 0.3s ease-out',
       },
       keyframes: {
         fadeIn: {
-          '0%': { opacity: '0', transform: 'translateY(4px)' },
+          '0%':   { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        slideUp: {
+          '0%':   { opacity: '0', transform: 'translateY(8px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
       },
