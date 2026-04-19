@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { DEMO_MODE_KEY } from '../lib/api';
-import { DEMO_USER } from '../lib/demoData';
+import { DEMO_MODE_KEY, DEMO_USER } from '../lib/demoData';
 
 interface User {
   id: string;

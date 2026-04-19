@@ -3,6 +3,8 @@
  * Used when no live API is available.
  */
 
+export const DEMO_MODE_KEY = 'swellnessiq_demo';
+
 const today = new Date();
 const daysAgo = (n: number) => new Date(today.getTime() - n * 86400000).toISOString();
 

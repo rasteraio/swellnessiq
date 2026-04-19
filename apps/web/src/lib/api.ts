@@ -1,12 +1,12 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '../stores/authStore';
 import {
-  DEMO_DASHBOARD, DEMO_LEARNING_PLAN, DEMO_VITALS,
+  DEMO_MODE_KEY, DEMO_DASHBOARD, DEMO_LEARNING_PLAN, DEMO_VITALS,
   DEMO_CHAT_SESSIONS, DEMO_NEW_SESSION, DEMO_CHAT_RESPONSES,
   getDemoModule,
 } from './demoData';
 
-export const DEMO_MODE_KEY = 'swellnessiq_demo';
+export { DEMO_MODE_KEY };
 
 function matchPath(url: string, pattern: RegExp) {
   return pattern.exec(url);
