@@ -4,7 +4,7 @@ dockerfilePath = "Dockerfile"
 buildCommand = ""
 
 [deploy]
-startCommand = "sh -c 'cd apps/api && npx prisma db push --accept-data-loss && node dist/index.js'"
+startCommand = "/app/apps/api/entrypoint.sh"
 healthcheckPath = "/health"
 healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"

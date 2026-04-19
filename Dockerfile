@@ -46,6 +46,9 @@ COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY apps/api/prisma ./apps/api/prisma
 RUN cd apps/api && npx prisma generate
 
+COPY apps/api/entrypoint.sh ./apps/api/entrypoint.sh
+RUN chmod +x ./apps/api/entrypoint.sh
+
 EXPOSE 3001
 
-CMD ["sh", "-c", "cd apps/api && npx prisma db push --accept-data-loss && node dist/index.js"]
+CMD ["/app/apps/api/entrypoint.sh"]
