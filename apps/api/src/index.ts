@@ -19,7 +19,7 @@ async function bootstrap() {
     logger.info('Scheduler started');
 
     app.listen(PORT, () => {
-      logger.info(`Rastera API running on port ${PORT} [${process.env.NODE_ENV}]`);
+      logger.info(`SwellnessIQ API running on port ${PORT} [${process.env.NODE_ENV}]`);
     });
   } catch (error) {
     logger.error('Failed to start server', { error });
