@@ -49,4 +49,4 @@ RUN cd apps/api && npx prisma generate
 EXPOSE 3001
 
 # Run prisma db push in background so the server binds the port immediately
-CMD ["sh", "-c", "cd /app/apps/api && npx prisma db push --accept-data-loss & exec node dist/index.js"]
+CMD ["sh", "-c", "cd /app/apps/api && npx prisma db push --accept-data-loss & exec node /app/apps/api/dist/index.js"]
