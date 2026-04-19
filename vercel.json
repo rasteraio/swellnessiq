@@ -7,7 +7,7 @@
   "rewrites": [
     {
       "source": "/api/v1/:path*",
-      "destination": "https://rastera-api.up.railway.app/api/v1/:path*"
+      "destination": "https://api-production-9cbe.up.railway.app/api/v1/:path*"
     }
   ],
   "headers": [
