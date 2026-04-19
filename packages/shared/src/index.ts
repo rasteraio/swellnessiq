@@ -10,10 +10,11 @@ export enum UserRole {
 export enum ModuleType {
   CORE_CONDITION = 'CORE_CONDITION',
   SELF_MONITORING = 'SELF_MONITORING',
-  COMORBIDITY = 'COMORBIDITY',
+  BRANCHING = 'BRANCHING',
   POLYPHARMACY = 'POLYPHARMACY',
   SOCIAL_DETERMINANTS = 'SOCIAL_DETERMINANTS',
   REINFORCEMENT = 'REINFORCEMENT',
+  PLATFORM_FUNDAMENTALS = 'PLATFORM_FUNDAMENTALS',
 }
 
 export enum ModuleStatus {
@@ -24,17 +25,22 @@ export enum ModuleStatus {
   SKIPPED = 'SKIPPED',
 }
 
+// Primary HRRP conditions (6 penalized conditions + cross-cutting comorbidities)
 export enum Condition {
+  // Primary HRRP conditions
   HEART_FAILURE = 'HEART_FAILURE',
   COPD = 'COPD',
-  AMI = 'AMI',
+  ACUTE_MI = 'ACUTE_MI',
   CABG = 'CABG',
-  KIDNEY_DISEASE = 'KIDNEY_DISEASE',
+  THA_TKA = 'THA_TKA',
   PNEUMONIA = 'PNEUMONIA',
+  // Comorbidities (used for branching logic)
   DIABETES = 'DIABETES',
-  HYPERTENSION = 'HYPERTENSION',
+  CKD = 'CKD',
   ATRIAL_FIBRILLATION = 'ATRIAL_FIBRILLATION',
-  STROKE = 'STROKE',
+  HEART_FAILURE_COMORBID = 'HEART_FAILURE_COMORBID',
+  ANXIETY_DEPRESSION = 'ANXIETY_DEPRESSION',
+  HYPERTENSION = 'HYPERTENSION',
 }
 
 export enum EngagementLevel {
@@ -56,6 +62,13 @@ export enum NotificationChannel {
   SMS = 'SMS',
   EMAIL = 'EMAIL',
   IN_APP = 'IN_APP',
+  PHONE = 'PHONE',
+}
+
+export enum EngagementEscalation {
+  PUSH_48H = 'PUSH_48H',
+  CLINICAL_ALERT_72H = 'CLINICAL_ALERT_72H',
+  PHONE_OUTREACH_96H = 'PHONE_OUTREACH_96H',
 }
 
 // ─── Core Domain Types ────────────────────────────────────────────────────────
@@ -68,8 +81,13 @@ export interface PatientProfile {
   comorbidities: Condition[];
   medications: Medication[];
   engagementLevel: EngagementLevel;
-  riskScore: number; // 0-100, readmission risk
+  riskScore: number;            // 0–100 readmission risk
+  laceScore?: number;           // LACE+ index (Length, Acuity, Comorbidity, ED visits)
+  isIntensiveTrack: boolean;    // true when LACE+ ≥10
+  isMaintenanceMode: boolean;   // true after 3 consecutive ≥80% — monthly cadence
+  caregiverEnrolled: boolean;
   preferredLanguage: string;
+  simplifiedLanguage: boolean;  // 4th-grade level for SDOH-positive patients
   accessibilityNeeds: AccessibilityConfig;
   careTeamId?: string;
   createdAt: Date;
@@ -91,22 +109,28 @@ export interface AccessibilityConfig {
   screenReader: boolean;
   simplifiedLanguage: boolean;
   preferredMediaType: 'VIDEO' | 'AUDIO' | 'TEXT';
+  captionsEnabled: boolean;
+  audioOnly: boolean;
 }
+
+// ─── Module Architecture (Four-Part Structure) ────────────────────────────────
 
 export interface LearningModule {
   id: string;
+  slug: string;
   title: string;
   description: string;
   type: ModuleType;
   targetConditions: Condition[];
-  daysPostDischarge: number;
+  daysPostDischarge: number;     // Negative = pre-discharge (e.g., -1 = day before)
   estimatedMinutes: number;
-  contentBlocks: ContentBlock[];
+  isMandatory: boolean;          // Non-skippable (medication list, warning signs, etc.)
+  masteryThreshold: number;      // Default 80 (%)
+  contentBlocks: ContentBlock[]; // Hook → Core → Application → Check
   exercises: Exercise[];
   branchingRules: BranchingRule[];
-  prerequisites: string[]; // module IDs
+  prerequisites: string[];
   refreshIntervalDays?: number;
-  aiGeneratedSummary?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -114,12 +138,13 @@ export interface LearningModule {
 export interface ContentBlock {
   id: string;
   order: number;
+  phase: 'HOOK' | 'CORE' | 'APPLICATION' | 'KNOWLEDGE_CHECK';
   type: 'VIDEO' | 'TEXT' | 'INFOGRAPHIC' | 'ANIMATION';
   title: string;
-  content: string; // URL for video/image, markdown for text
+  content: string;
   durationSeconds?: number;
   transcript?: string;
-  altText?: string; // accessibility
+  altText?: string;
 }
 
 export interface Exercise {
@@ -130,22 +155,18 @@ export interface Exercise {
   prompt: string;
   options?: ExerciseOption[];
   correctAnswerId?: string;
-  scoringLogic?: ScoringLogic;
+  masteryThreshold: number; // 80%
+  failureAction: 'IMMEDIATE_REINFORCEMENT' | 'SHORTENED_INTERVAL' | 'CLINICAL_ALERT';
+  consecutiveFailureLimit: number; // default 3 — triggers nurse navigator alert
 }
 
 export interface ExerciseOption {
   id: string;
   text: string;
   value: string;
-  nextModuleId?: string; // branching
+  isCorrect: boolean;
+  nextModuleId?: string;
   feedback?: string;
-}
-
-export interface ScoringLogic {
-  passingScore: number;
-  maxScore: number;
-  failureAction: 'REPEAT' | 'BRANCH' | 'ESCALATE';
-  failureBranchModuleId?: string;
 }
 
 export interface BranchingRule {
@@ -156,14 +177,16 @@ export interface BranchingRule {
 }
 
 export interface BranchCondition {
-  type: 'SCORE' | 'RESPONSE' | 'ENGAGEMENT' | 'CONDITION' | 'DAYS_POST_DISCHARGE';
+  type: 'SCORE' | 'RESPONSE' | 'ENGAGEMENT' | 'CONDITION' | 'DAYS_POST_DISCHARGE'
+      | 'LACE_SCORE' | 'MEDICATION_COUNT' | 'NO_ENGAGEMENT_HOURS' | 'CONSECUTIVE_FAILURES';
   operator: 'GT' | 'LT' | 'EQ' | 'GTE' | 'LTE' | 'IN';
   value: string | number | string[];
   exerciseId?: string;
 }
 
 export interface BranchAction {
-  type: 'UNLOCK_MODULE' | 'SKIP_MODULE' | 'ADD_MODULE' | 'ESCALATE_TO_CARE_TEAM' | 'SEND_ALERT';
+  type: 'UNLOCK_MODULE' | 'SKIP_MODULE' | 'ADD_MODULE' | 'ESCALATE_TO_CARE_TEAM'
+      | 'SEND_ALERT' | 'REQUIRE_CAREGIVER' | 'SET_INTENSIVE_TRACK' | 'BYPASS_TO_EMERGENCY';
   targetModuleId?: string;
   alertMessage?: string;
 }
@@ -176,9 +199,11 @@ export interface PatientProgress {
   startedAt?: Date;
   completedAt?: Date;
   score?: number;
+  consecutiveFailures: number;
+  attemptCount: number;
   exerciseResponses: ExerciseResponse[];
   timeSpentSeconds: number;
-  engagementScore: number; // 0-100
+  engagementScore: number;
 }
 
 export interface ExerciseResponse {
@@ -192,10 +217,12 @@ export interface ExerciseResponse {
 export interface LearningPlan {
   id: string;
   patientId: string;
+  track: 'STANDARD' | 'INTENSIVE' | 'MAINTENANCE';
   scheduledModules: ScheduledModule[];
   generatedAt: Date;
   lastAdaptedAt: Date;
   adaptationHistory: AdaptationEvent[];
+  consecutivePasses: number; // 3 = graduation to maintenance
 }
 
 export interface ScheduledModule {
@@ -203,8 +230,8 @@ export interface ScheduledModule {
   scheduledDate: Date;
   actualDeliveryDate?: Date;
   status: ModuleStatus;
-  isAdaptive: boolean; // true if added by AI engine
-  reason?: string; // why it was added (e.g., "low quiz score on CHF basics")
+  isAdaptive: boolean;
+  reason?: string;
 }
 
 export interface AdaptationEvent {
@@ -219,7 +246,8 @@ export interface Alert {
   id: string;
   patientId: string;
   severity: AlertSeverity;
-  type: 'SYMPTOM' | 'ENGAGEMENT' | 'MEDICATION' | 'VITAL' | 'MISSED_MODULE';
+  type: 'SYMPTOM' | 'ENGAGEMENT' | 'MEDICATION' | 'VITAL' | 'MISSED_MODULE'
+      | 'NURSE_NAVIGATOR' | 'EMERGENCY_BYPASS';
   message: string;
   isAcknowledged: boolean;
   acknowledgedBy?: string;
@@ -265,14 +293,19 @@ export interface ResponseMeta {
 
 export interface PatientAnalytics {
   patientId: string;
-  moduleCompletionRate: number; // 0-1
+  moduleCompletionRate: number;
+  firstAttemptPassRate: number;    // Target ≥75% per module
+  timeToFirstView: number;         // Hours — target <24h; alert >48h
+  reServeRate: number;             // >30% indicates content review needed
   averageScore: number;
   totalEngagementMinutes: number;
   streakDays: number;
   lastActiveAt: Date;
   engagementTrend: 'IMPROVING' | 'STABLE' | 'DECLINING';
-  predictedReadmissionRisk: number; // 0-100
+  predictedReadmissionRisk: number;
   alertCount: number;
+  consecutivePasses: number;
+  track: 'STANDARD' | 'INTENSIVE' | 'MAINTENANCE';
 }
 
 export interface CohortAnalytics {
@@ -280,8 +313,9 @@ export interface CohortAnalytics {
   activePatients: number;
   averageEngagementRate: number;
   averageCompletionRate: number;
+  averageFirstAttemptPassRate: number;
   readmissionRate: number;
-  conditionBreakdown: Record<Condition, number>;
+  conditionBreakdown: Record<string, number>;
   engagementBreakdown: Record<EngagementLevel, number>;
 }
 
@@ -316,4 +350,5 @@ export interface PatientChatContext {
   recentModulesCompleted: string[];
   activeAlerts: string[];
   daysPostDischarge: number;
+  isIntensiveTrack: boolean;
 }

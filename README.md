@@ -1,8 +1,11 @@
-# Rastera Health
+# SwellnessIQ
 
-> Patient-centric digital health platform for post-discharge recovery
+> Adaptive microlearning platform for post-discharge recovery and hospital readmission reduction
 
-Rastera reduces 30-day hospital readmissions through AI-driven adaptive microlearning, personalized content delivery, and continuous engagement — helping patients manage their recovery at home.
+SwellnessIQ reduces 30-day hospital readmissions through AI-driven adaptive microlearning, personalized content delivery, and continuous engagement — targeting the 6 CMS HRRP (Hospital Readmissions Reduction Program) penalized conditions.
+
+**Clinical benchmark:** Coleman Care Transitions Model — 4.4 percentage point reduction in 30-day readmissions.
+**Target conditions:** Heart Failure, COPD, Acute MI, CABG, THA/TKA, Pneumonia.
 
 ---
 
@@ -15,13 +18,13 @@ apps/
 │   └── src/
 │       ├── routes/           REST API endpoints
 │       ├── services/         Business logic
-│       │   ├── learningPlanEngine.ts    Adaptive module scheduling
-│       │   ├── aiRecommendationEngine.ts  Claude-powered AI
-│       │   ├── chatService.ts            Patient Q&A assistant
-│       │   ├── engagementService.ts      Engagement tracking
+│       │   ├── learningPlanEngine.ts    Adaptive module scheduling + clinical protocol
+│       │   ├── aiRecommendationEngine.ts  Claude-powered AI recommendations
+│       │   ├── chatService.ts            SwellnessIQ Assistant (patient Q&A)
+│       │   ├── engagementService.ts      Engagement tracking + escalation
 │       │   └── notificationService.ts    Multi-channel notifications
 │       ├── middleware/       Auth, audit logging, error handling
-│       └── jobs/             Cron scheduler
+│       └── jobs/             Cron scheduler (module unlock, engagement escalation)
 │
 └── web/          Next.js 14 frontend
     └── src/
@@ -42,6 +45,30 @@ packages/
 docs/
 └── ARCHITECTURE.md   Full system architecture, DB schema, API routes, AI strategy
 ```
+
+---
+
+## Clinical Protocol
+
+### Adaptive Tracks
+| Track | Criteria | Cadence |
+|-------|----------|---------|
+| Standard | LACE+ < 10 | Modules every 2-3 days |
+| Intensive | LACE+ ≥ 10 | Daily modules Days 1-14 + required caregiver |
+| Maintenance | 3 consecutive ≥80% passes | Monthly modules |
+
+### Engagement Escalation
+| Threshold | Action |
+|-----------|--------|
+| 48h no engagement | Automated push notification |
+| 72h no engagement | Clinical alert to nurse navigator |
+| 96h no engagement | Phone outreach required |
+| 3 consecutive failures | Nurse navigator alert (mandatory) |
+
+### Module Structure (Four-Part)
+Each module: **Hook** (30s) → **Core Content** (90-120s) → **Application** (30-45s) → **Knowledge Check** (2-3 questions)
+
+**Mastery threshold: 80%** (competency-based medical education standard)
 
 ---
 
@@ -67,7 +94,7 @@ cp apps/api/.env.example apps/api/.env
 ### 3. Set up database
 ```bash
 npm run db:migrate    # Run Prisma migrations
-npm run db:seed       # Seed with sample data
+npm run db:seed       # Seed with 130 SwellnessIQ modules + sample patients
 ```
 
 ### 4. Run development servers
@@ -80,39 +107,55 @@ npm run dev
 ### Sample accounts (after seed)
 | Role | Email | Password |
 |------|-------|----------|
-| Admin | admin@rastera.health | Admin123! |
-| Care Coordinator | coordinator@rastera.health | Coord123! |
-| Patient | patient@rastera.health | Patient123! |
+| Admin | admin@swellnessiq.com | Admin123! |
+| Care Coordinator | coordinator@swellnessiq.com | Coord123! |
+| Patient (HF, LACE+ 12, Intensive) | patient@swellnessiq.com | Patient123! |
 
 ---
 
 ## Key Features
 
 ### Patient Experience
-- **Adaptive microlearning** — 5-minute modules timed to post-discharge milestones (Day 2, 5, 7, 10...)
-- **AI-powered chat** — RasteraAssist provides safe, non-diagnostic health education guidance
+- **Adaptive microlearning** — 5-minute modules timed to post-discharge milestones (Day 1, 2, 5, 7, 10...)
+- **AI-powered chat** — SwellnessIQ Assistant provides safe, non-diagnostic health education guidance
 - **Vital monitoring** — Log weight, BP, O2 sat, heart rate with automatic abnormal detection
 - **Progress tracking** — Visual dashboard showing completion rate, upcoming modules, streaks
-- **Accessible UI** — Large text, high contrast, captions, simplified language modes
+- **Accessible UI** — Large text, high contrast, captions, simplified language modes (4th-grade for SDOH patients)
 
 ### Adaptive Learning Engine
-- **Score-based branching** — Poor quiz performance (<60%) triggers reinforcement modules
-- **Engagement-driven adaptation** — Declining engagement unlocks AI-curated intervention content
-- **Condition branching** — New comorbidities inject relevant modules automatically
-- **Reinforcement cycles** — Modules repeat at defined intervals (default: 14 days)
-- **Timeline scheduling** — All modules are date-stamped to the patient's discharge date
+- **LACE+ scoring** — ≥10 triggers intensive daily track with required caregiver enrollment
+- **80% mastery threshold** — below threshold triggers immediate reinforcement module
+- **Engagement escalation** — 48h/72h/96h push → clinical alert → phone outreach protocol
+- **Graduation logic** — 3 consecutive ≥80% passes → monthly maintenance mode
+- **Polypharmacy track** — ≥5 discharge medications injects medication management modules Days 3-5
+- **Mandatory modules** — medication list, warning signs, emergency thresholds are non-skippable
+- **Pre-discharge delivery** — welcome and platform orientation modules delivered 24-48h before discharge
+
+### Module Library (130 modules)
+| Condition | Count |
+|-----------|-------|
+| Heart Failure | 20 |
+| COPD | 19 |
+| Acute MI | 18 |
+| CABG | 21 |
+| THA/TKA | 18 |
+| Pneumonia | 16 |
+| Polypharmacy | 10 |
+| Social Determinants | 5 |
+| Platform Fundamentals | 3 |
 
 ### AI Integration (Claude)
 - **Recommendations** — `claude-opus-4-6` analyzes patient profile to recommend optimal next modules
-- **Risk scoring** — Computes 30-day readmission risk (0–100) using behavioral + clinical signals
-- **Chat assistant** — Guardrailed Q&A with emergency escalation detection
-- **Content simplification** — Rewrites content at 6th-grade reading level for accessibility
-- **Nudges** — `claude-haiku-4-5` generates personalized engagement messages
+- **Risk scoring** — Computes 30-day readmission risk (0–100) using HRRP-weighted behavioral + clinical signals
+- **Chat assistant** — Guardrailed Q&A with emergency escalation detection (condition-specific warning signs)
+- **Content simplification** — Rewrites content at 6th-grade (4th-grade for SDOH) reading level
+- **Nudges** — `claude-haiku-4-5` generates personalized SMS/push engagement messages
 - **Prompt caching** — System prompts cached for cost/latency efficiency
 
 ### Care Team Portal
-- Patient roster sorted by risk score
-- Real-time alerts (abnormal vitals, engagement drops, urgent chat messages)
+- Patient roster sorted by risk score + LACE+ tier
+- Real-time alerts: abnormal vitals, engagement drops, consecutive failures, emergency bypass
+- Nurse navigator alerts at 72h no-engagement and 3 consecutive failures
 - Secure messaging with patients
 - Cohort analytics dashboard
 - HIPAA-compliant audit trail
@@ -162,6 +205,8 @@ npm run dev
 - [ ] CloudWatch / Datadog monitoring + alerting
 - [ ] Automated DB backups with PITR
 - [ ] Penetration testing before go-live
+- [ ] FHIR R4 / SMART on FHIR EHR integration (Epic, Cerner) — Phase 2
+- [ ] Validic RPM integration (CPT 99453/99454/99457/99458) — Phase 3
 
 ---
 

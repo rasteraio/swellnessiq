@@ -1,8 +1,8 @@
 {
-  "name": "rastera-health",
+  "name": "swellnessiq",
   "version": "1.0.0",
   "private": true,
-  "description": "Patient-centric digital health platform for post-discharge recovery",
+  "description": "SwellnessIQ — adaptive microlearning platform for post-discharge recovery and HRRP readmission reduction",
   "workspaces": [
     "apps/*",
     "packages/*"

@@ -87,7 +87,7 @@ export default function ChatPage() {
             <Bot className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h1 className="font-semibold text-slate-800">RasteraAssist</h1>
+            <h1 className="font-semibold text-slate-800">SwellnessIQ Assistant</h1>
             <p className="text-xs text-slate-400">Health education support</p>
           </div>
         </div>
@@ -98,7 +98,7 @@ export default function ChatPage() {
         <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl">
           <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
           <p className="text-xs text-amber-700">
-            RasteraAssist provides education only — not medical advice.
+            SwellnessIQ Assistant provides education only — not medical advice.
             For urgent symptoms, call <strong>911</strong> or your care team.
           </p>
         </div>
@@ -110,7 +110,7 @@ export default function ChatPage() {
           {!sessionId && (
             <div className="text-center py-12">
               <Bot className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-              <h2 className="text-xl font-semibold text-slate-700 mb-2">Ask RasteraAssist</h2>
+              <h2 className="text-xl font-semibold text-slate-700 mb-2">Ask SwellnessIQ Assistant</h2>
               <p className="text-slate-400 mb-6">Get answers about your recovery, medications, and care plan.</p>
               <button
                 onClick={() => createSessionMutation.mutate()}

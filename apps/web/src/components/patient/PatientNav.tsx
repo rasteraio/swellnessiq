@@ -22,9 +22,9 @@ export function PatientNav() {
       <header className="bg-white border-b border-slate-100 px-4 h-14 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-xs">R</span>
+            <span className="text-white font-bold text-xs">S</span>
           </div>
-          <span className="font-semibold text-slate-700">Rastera</span>
+          <span className="font-semibold text-slate-700">SwellnessIQ</span>
         </div>
         <Link href="/notifications" className="relative p-2 min-h-0 min-w-0 w-9 h-9 flex items-center justify-center">
           <div className="w-5 h-5 text-slate-400">

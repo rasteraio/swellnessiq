@@ -7,13 +7,13 @@ import { Toaster } from '../components/ui/Toaster';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Rastera Health — Your Recovery Companion',
-  description: 'Personalized post-discharge care and education to support your recovery.',
+  title: 'SwellnessIQ — Your Recovery Companion',
+  description: 'Personalized post-discharge care and education to reduce hospital readmissions.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'Rastera Health',
+    title: 'SwellnessIQ',
   },
 };
 

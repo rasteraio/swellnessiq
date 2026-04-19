@@ -1,4 +1,4 @@
-// Rastera Health — Database Schema
+// SwellnessIQ — Database Schema
 // PostgreSQL via Prisma ORM
 
 generator client {
@@ -28,7 +28,6 @@ model User {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  // Relations
   patient           PatientProfile?
   careTeamMember    CareTeamMember?
   sentMessages      CareMessage[]     @relation("MessageAuthor")
@@ -61,23 +60,31 @@ model UserSession {
 model PatientProfile {
   id                   String             @id @default(cuid())
   userId               String             @unique
-  mrn                  String?            @unique // Medical Record Number (EHR link)
+  mrn                  String?            @unique
   dischargeDate        DateTime
   admissionDate        DateTime?
   primaryCondition     Condition
-  riskScore            Float              @default(0) // 0–100 readmission risk
+  riskScore            Float              @default(0)
+  laceScore            Int?               // LACE+ index — ≥10 triggers intensive track
+  isIntensiveTrack     Boolean            @default(false)
+  isMaintenanceMode    Boolean            @default(false) // after 3 consecutive ≥80%
+  consecutivePasses    Int                @default(0)
+  caregiverEnrolled    Boolean            @default(false)
+  caregiverEmail       String?
+  caregiverPhone       String?
   engagementLevel      EngagementLevel    @default(MEDIUM)
+  lastEngagementAt     DateTime?
   preferredLanguage    String             @default("en")
+  simplifiedLanguage   Boolean            @default(false) // 4th-grade level (SDOH flag)
   dateOfBirth          DateTime?
   gender               String?
-  zipCode              String?            // for SDOH analysis
+  zipCode              String?
   insuranceType        String?
   facilityId           String?
   careTeamId           String?
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
-  // Relations
   user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   facility             Facility?          @relation(fields: [facilityId], references: [id])
   careTeam             CareTeam?          @relation(fields: [careTeamId], references: [id])
@@ -93,11 +100,13 @@ model PatientProfile {
   analytics            PatientAnalyticsSnapshot[]
   accessibilityConfig  AccessibilityConfig?
   notifications        Notification[]     @relation("PatientNotifications")
+  engagementEscalations EngagementEscalationLog[]
 
   @@index([userId])
   @@index([primaryCondition])
   @@index([engagementLevel])
   @@index([dischargeDate])
+  @@index([isIntensiveTrack])
   @@map("patient_profiles")
 }
 
@@ -124,13 +133,13 @@ model Medication {
   genericName   String?
   dosage        String
   frequency     String
-  route         String?        // oral, IV, inhaled, etc.
+  route         String?
   instructions  String?
   startDate     DateTime
   endDate       DateTime?
   prescribedBy  String?
   isActive      Boolean        @default(true)
-  rxNormCode    String?        // standardized drug code
+  rxNormCode    String?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
@@ -147,6 +156,7 @@ model AccessibilityConfig {
   highContrast         Boolean        @default(false)
   screenReader         Boolean        @default(false)
   simplifiedLanguage   Boolean        @default(false)
+  audioOnly            Boolean        @default(false)
   preferredMediaType   MediaType      @default(VIDEO)
   captionsEnabled      Boolean        @default(true)
   updatedAt            DateTime       @updatedAt
@@ -156,17 +166,34 @@ model AccessibilityConfig {
   @@map("accessibility_configs")
 }
 
+// ─── Engagement Escalation Log ────────────────────────────────────────────────
+
+model EngagementEscalationLog {
+  id            String             @id @default(cuid())
+  patientId     String
+  escalationType EscalationType
+  hoursInactive  Int
+  actionTaken   String
+  resolvedAt    DateTime?
+  createdAt     DateTime           @default(now())
+
+  patient       PatientProfile     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@map("engagement_escalation_logs")
+}
+
 // ─── Care Team ────────────────────────────────────────────────────────────────
 
 model CareTeam {
-  id        String           @id @default(cuid())
-  name      String
+  id         String           @id @default(cuid())
+  name       String
   facilityId String?
-  createdAt DateTime         @default(now())
+  createdAt  DateTime         @default(now())
 
-  facility  Facility?        @relation(fields: [facilityId], references: [id])
-  members   CareTeamMember[]
-  patients  PatientProfile[]
+  facility   Facility?        @relation(fields: [facilityId], references: [id])
+  members    CareTeamMember[]
+  patients   PatientProfile[]
 
   @@map("care_teams")
 }
@@ -175,7 +202,7 @@ model CareTeamMember {
   id         String    @id @default(cuid())
   userId     String    @unique
   careTeamId String
-  title      String?   // "RN", "MD", "Care Coordinator"
+  title      String?
   specialty  String?
   createdAt  DateTime  @default(now())
 
@@ -186,20 +213,20 @@ model CareTeamMember {
 }
 
 model Facility {
-  id         String           @id @default(cuid())
-  name       String
-  npi        String?          @unique // National Provider Identifier
-  address    String?
-  city       String?
-  state      String?
-  zipCode    String?
-  fhirBaseUrl String?         // EHR/FHIR integration endpoint
-  isActive   Boolean          @default(true)
-  createdAt  DateTime         @default(now())
+  id           String           @id @default(cuid())
+  name         String
+  npi          String?          @unique
+  address      String?
+  city         String?
+  state        String?
+  zipCode      String?
+  fhirBaseUrl  String?
+  isActive     Boolean          @default(true)
+  createdAt    DateTime         @default(now())
 
-  patients   PatientProfile[]
-  careTeams  CareTeam[]
-  modules    LearningModule[] @relation("FacilityModules")
+  patients     PatientProfile[]
+  careTeams    CareTeam[]
+  modules      LearningModule[] @relation("FacilityModules")
 
   @@map("facilities")
 }
@@ -213,18 +240,17 @@ model LearningModule {
   description          String
   type                 ModuleType
   estimatedMinutes     Int             @default(5)
-  daysPostDischarge    Int             // when to first deliver
-  refreshIntervalDays  Int?            // for reinforcement modules
-  difficulty           Int             @default(1) // 1-5
+  daysPostDischarge    Int             // Negative = pre-discharge (-1 = day before discharge)
+  refreshIntervalDays  Int?
+  difficulty           Int             @default(1)
+  isMandatory          Boolean         @default(false) // Non-skippable per clinical protocol
+  masteryThreshold     Int             @default(80)    // 80% — competency-based medical standard
+  consecutiveFailureLimit Int          @default(3)     // Triggers nurse navigator alert
   isActive             Boolean         @default(true)
-  isAIGenerated        Boolean         @default(false)
-  aiGeneratedSummary   String?
-  thumbnailUrl         String?
-  facilityId           String?         // null = global module
+  facilityId           String?
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
 
-  // Relations
   facility             Facility?       @relation("FacilityModules", fields: [facilityId], references: [id])
   targetConditions     ModuleCondition[]
   contentBlocks        ContentBlock[]
@@ -237,6 +263,7 @@ model LearningModule {
 
   @@index([type])
   @@index([daysPostDischarge])
+  @@index([isMandatory])
   @@map("learning_modules")
 }
 
@@ -268,14 +295,14 @@ model ContentBlock {
   id              String         @id @default(cuid())
   moduleId        String
   order           Int
+  phase           ContentPhase   @default(CORE)
   type            ContentType
   title           String
-  content         String         // URL or markdown text
+  content         String
   durationSeconds Int?
   transcript      String?
   altText         String?
   thumbnailUrl    String?
-  aiGeneratedAt   DateTime?      // if content was AI-generated
   createdAt       DateTime       @default(now())
 
   module          LearningModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
@@ -285,56 +312,57 @@ model ContentBlock {
 }
 
 model Exercise {
-  id               String           @id @default(cuid())
-  moduleId         String
-  order            Int
-  type             ExerciseType
-  prompt           String
-  passingScore     Int?             // for scored exercises (0-100)
-  maxScore         Int?
-  failureAction    FailureAction    @default(REPEAT)
-  failureBranchId  String?          // moduleId to branch to on failure
-  createdAt        DateTime         @default(now())
+  id                      String           @id @default(cuid())
+  moduleId                String
+  order                   Int
+  type                    ExerciseType
+  prompt                  String
+  masteryThreshold        Int              @default(80)
+  maxScore                Int?
+  failureAction           FailureAction    @default(IMMEDIATE_REINFORCEMENT)
+  consecutiveFailureLimit Int              @default(3)
+  failureBranchId         String?
+  createdAt               DateTime         @default(now())
 
-  module           LearningModule   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  options          ExerciseOption[]
-  responses        ExerciseResponse[]
-  branchingRules   BranchingRule[]
+  module                  LearningModule   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  options                 ExerciseOption[]
+  responses               ExerciseResponse[]
+  branchingRules          BranchingRule[]
 
   @@index([moduleId])
   @@map("exercises")
 }
 
 model ExerciseOption {
-  id               String     @id @default(cuid())
-  exerciseId       String
-  text             String
-  value            String
-  isCorrect        Boolean    @default(false)
-  feedback         String?
-  nextModuleId     String?    // for branching
+  id           String     @id @default(cuid())
+  exerciseId   String
+  text         String
+  value        String
+  isCorrect    Boolean    @default(false)
+  feedback     String?
+  nextModuleId String?
 
-  exercise         Exercise   @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  exercise     Exercise   @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
 
   @@index([exerciseId])
   @@map("exercise_options")
 }
 
 model BranchingRule {
-  id               String           @id @default(cuid())
-  moduleId         String
-  exerciseId       String?
-  priority         Int              @default(0)
-  conditionType    BranchConditionType
+  id                String              @id @default(cuid())
+  moduleId          String
+  exerciseId        String?
+  priority          Int                 @default(0)
+  conditionType     BranchConditionType
   conditionOperator BranchOperator
-  conditionValue   String           // JSON string for complex values
-  actionType       BranchActionType
-  targetModuleId   String?
-  alertMessage     String?
-  createdAt        DateTime         @default(now())
+  conditionValue    String
+  actionType        BranchActionType
+  targetModuleId    String?
+  alertMessage      String?
+  createdAt         DateTime            @default(now())
 
-  module           LearningModule   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  exercise         Exercise?        @relation(fields: [exerciseId], references: [id])
+  module            LearningModule      @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  exercise          Exercise?           @relation(fields: [exerciseId], references: [id])
 
   @@index([moduleId])
   @@map("branching_rules")
@@ -343,17 +371,19 @@ model BranchingRule {
 // ─── Learning Plans & Progress ────────────────────────────────────────────────
 
 model LearningPlan {
-  id               String            @id @default(cuid())
-  patientId        String            @unique
-  generatedAt      DateTime          @default(now())
-  lastAdaptedAt    DateTime          @default(now())
-  adaptationCount  Int               @default(0)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  id                String            @id @default(cuid())
+  patientId         String            @unique
+  track             PlanTrack         @default(STANDARD)
+  consecutivePasses Int               @default(0) // 3 → graduation to MAINTENANCE
+  generatedAt       DateTime          @default(now())
+  lastAdaptedAt     DateTime          @default(now())
+  adaptationCount   Int               @default(0)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
 
-  patient          PatientProfile    @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  scheduledModules ScheduledModule[]
-  adaptationEvents AdaptationEvent[]
+  patient           PatientProfile    @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  scheduledModules  ScheduledModule[]
+  adaptationEvents  AdaptationEvent[]
 
   @@map("learning_plans")
 }
@@ -383,8 +413,8 @@ model AdaptationEvent {
   id             String       @id @default(cuid())
   planId         String
   trigger        String
-  modulesAdded   String[]     // module IDs
-  modulesRemoved String[]     // module IDs
+  modulesAdded   String[]
+  modulesRemoved String[]
   explanation    String
   createdAt      DateTime     @default(now())
 
@@ -395,22 +425,23 @@ model AdaptationEvent {
 }
 
 model PatientProgress {
-  id                String             @id @default(cuid())
-  patientId         String
-  moduleId          String
-  status            ModuleStatus       @default(LOCKED)
-  startedAt         DateTime?
-  completedAt       DateTime?
-  score             Float?             // 0-100
-  timeSpentSeconds  Int                @default(0)
-  engagementScore   Float              @default(0) // 0-100
-  attemptCount      Int                @default(0)
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  id                   String             @id @default(cuid())
+  patientId            String
+  moduleId             String
+  status               ModuleStatus       @default(LOCKED)
+  startedAt            DateTime?
+  completedAt          DateTime?
+  score                Float?
+  consecutiveFailures  Int                @default(0)
+  attemptCount         Int                @default(0)
+  timeSpentSeconds     Int                @default(0)
+  engagementScore      Float              @default(0)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
 
-  patient           PatientProfile     @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  module            LearningModule     @relation(fields: [moduleId], references: [id])
-  responses         ExerciseResponse[]
+  patient              PatientProfile     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  module               LearningModule     @relation(fields: [moduleId], references: [id])
+  responses            ExerciseResponse[]
 
   @@unique([patientId, moduleId])
   @@index([patientId])
@@ -432,7 +463,6 @@ model ExerciseResponse {
   exercise           Exercise        @relation(fields: [exerciseId], references: [id])
 
   @@index([progressId])
-  @@index([exerciseId])
   @@map("exercise_responses")
 }
 
@@ -457,18 +487,18 @@ model VitalLog {
 }
 
 model SymptomLog {
-  id           String         @id @default(cuid())
-  patientId    String
-  symptom      String
-  severity     Int            // 1-10
-  notes        String?
-  loggedAt     DateTime       @default(now())
-  escalated    Boolean        @default(false)
+  id             String         @id @default(cuid())
+  patientId      String
+  symptom        String
+  severity       Int
+  isEmergency    Boolean        @default(false) // triggers bypass to 911 guidance
+  notes          String?
+  loggedAt       DateTime       @default(now())
+  escalated      Boolean        @default(false)
 
-  patient      PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patient        PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
   @@index([patientId])
-  @@index([loggedAt])
   @@map("symptom_logs")
 }
 
@@ -569,19 +599,23 @@ model Notification {
 // ─── Analytics ────────────────────────────────────────────────────────────────
 
 model PatientAnalyticsSnapshot {
-  id                        String         @id @default(cuid())
+  id                        String          @id @default(cuid())
   patientId                 String
-  snapshotDate              DateTime       @default(now())
-  moduleCompletionRate      Float          @default(0)
-  averageScore              Float          @default(0)
-  totalEngagementMinutes    Float          @default(0)
-  streakDays                Int            @default(0)
+  snapshotDate              DateTime        @default(now())
+  moduleCompletionRate      Float           @default(0)
+  firstAttemptPassRate      Float           @default(0)  // Target ≥75%
+  timeToFirstViewHours      Float?          // Target <24h
+  reServeRate               Float           @default(0)  // >30% = content review
+  averageScore              Float           @default(0)
+  totalEngagementMinutes    Float           @default(0)
+  streakDays                Int             @default(0)
   engagementTrend           EngagementTrend @default(STABLE)
-  predictedReadmissionRisk  Float          @default(0)
-  alertCount                Int            @default(0)
+  predictedReadmissionRisk  Float           @default(0)
+  alertCount                Int             @default(0)
+  track                     PlanTrack       @default(STANDARD)
   lastActiveAt              DateTime?
 
-  patient                   PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patient                   PatientProfile  @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
   @@index([patientId])
   @@index([snapshotDate])
@@ -593,7 +627,7 @@ model PatientAnalyticsSnapshot {
 model AuditLog {
   id           String    @id @default(cuid())
   userId       String?
-  action       String    // "READ_PATIENT", "UPDATE_MEDICATION", etc.
+  action       String
   resourceType String
   resourceId   String?
   ipAddress    String?
@@ -618,26 +652,30 @@ enum UserRole {
   ADMIN
 }
 
+// Six HRRP conditions + comorbidities for branching
 enum Condition {
   HEART_FAILURE
   COPD
-  AMI
+  ACUTE_MI
   CABG
-  KIDNEY_DISEASE
+  THA_TKA
   PNEUMONIA
   DIABETES
-  HYPERTENSION
+  CKD
   ATRIAL_FIBRILLATION
-  STROKE
+  HEART_FAILURE_COMORBID
+  ANXIETY_DEPRESSION
+  HYPERTENSION
 }
 
 enum ModuleType {
   CORE_CONDITION
   SELF_MONITORING
-  COMORBIDITY
+  BRANCHING
   POLYPHARMACY
   SOCIAL_DETERMINANTS
   REINFORCEMENT
+  PLATFORM_FUNDAMENTALS
 }
 
 enum ModuleStatus {
@@ -668,6 +706,15 @@ enum AlertType {
   MEDICATION
   VITAL
   MISSED_MODULE
+  NURSE_NAVIGATOR
+  EMERGENCY_BYPASS
+}
+
+enum ContentPhase {
+  HOOK
+  CORE
+  APPLICATION
+  KNOWLEDGE_CHECK
 }
 
 enum ContentType {
@@ -686,9 +733,9 @@ enum ExerciseType {
 }
 
 enum FailureAction {
-  REPEAT
-  BRANCH
-  ESCALATE
+  IMMEDIATE_REINFORCEMENT
+  SHORTENED_INTERVAL
+  CLINICAL_ALERT
 }
 
 enum BranchConditionType {
@@ -697,6 +744,10 @@ enum BranchConditionType {
   ENGAGEMENT
   CONDITION
   DAYS_POST_DISCHARGE
+  LACE_SCORE
+  MEDICATION_COUNT
+  NO_ENGAGEMENT_HOURS
+  CONSECUTIVE_FAILURES
 }
 
 enum BranchOperator {
@@ -714,6 +765,9 @@ enum BranchActionType {
   ADD_MODULE
   ESCALATE_TO_CARE_TEAM
   SEND_ALERT
+  REQUIRE_CAREGIVER
+  SET_INTENSIVE_TRACK
+  BYPASS_TO_EMERGENCY
 }
 
 enum VitalType {
@@ -725,6 +779,8 @@ enum VitalType {
   TEMPERATURE
   BLOOD_GLUCOSE
   RESPIRATORY_RATE
+  PEAK_FLOW
+  PAIN_SCORE
 }
 
 enum VitalSource {
@@ -732,6 +788,7 @@ enum VitalSource {
   DEVICE_SYNC
   CARE_TEAM
   EHR_IMPORT
+  RPM_VALIDIC
 }
 
 enum MediaType {
@@ -754,6 +811,8 @@ enum NotificationType {
   MESSAGE
   VITAL_REMINDER
   STREAK_MILESTONE
+  ENGAGEMENT_NUDGE
+  CAREGIVER_INVITE
 }
 
 enum NotificationChannel {
@@ -761,10 +820,23 @@ enum NotificationChannel {
   SMS
   EMAIL
   IN_APP
+  PHONE
 }
 
 enum EngagementTrend {
   IMPROVING
   STABLE
   DECLINING
+}
+
+enum PlanTrack {
+  STANDARD
+  INTENSIVE
+  MAINTENANCE
+}
+
+enum EscalationType {
+  PUSH_48H
+  CLINICAL_ALERT_72H
+  PHONE_OUTREACH_96H
 }
