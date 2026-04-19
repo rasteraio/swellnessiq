@@ -128,13 +128,7 @@ export class AIRecommendationEngine {
       const response = await anthropic.messages.create({
         model: 'claude-opus-4-6',
         max_tokens: 1024,
-        system: [
-          {
-            type: 'text',
-            text: SYSTEM_PROMPT,
-            cache_control: { type: 'ephemeral' }, // Prompt caching
-          },
-        ],
+        system: SYSTEM_PROMPT,
         messages: [
           {
             role: 'user',
