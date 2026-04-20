@@ -8,6 +8,7 @@ interface User {
   firstName: string;
   lastName: string;
   role: string;
+  phone?: string;
   patient?: { id: string; primaryCondition: string; engagementLevel: string; riskScore: number };
 }
 
