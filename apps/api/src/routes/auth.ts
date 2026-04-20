@@ -7,7 +7,7 @@ import {
   verifyRefreshToken, hashToken, generateSecureToken,
 } from '../lib/auth';
 import { authenticate, AuthRequest } from '../middleware/authenticate';
-import { authLimiter } from '../app';
+import { authLimiter } from '../middleware/rateLimiter';
 import { AppError } from '../middleware/errorHandler';
 
 const router = Router();

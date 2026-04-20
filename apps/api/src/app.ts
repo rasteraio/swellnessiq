@@ -64,13 +64,6 @@ app.use(rateLimit({
   message: { success: false, error: { code: 'RATE_LIMITED', message: 'Too many requests' } },
 }));
 
-// Stricter rate limit for auth endpoints
-export const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  message: { success: false, error: { code: 'RATE_LIMITED', message: 'Too many auth attempts' } },
-});
-
 // ─── General Middleware ───────────────────────────────────────────────────────
 
 app.use(compression());
