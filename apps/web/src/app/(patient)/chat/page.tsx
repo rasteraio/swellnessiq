@@ -102,7 +102,7 @@ export default function ChatPage() {
   const messages: Message[] = session?.messages || [];
 
   return (
-    <div className="h-screen bg-slate-50 flex flex-col overflow-hidden">
+    <div className="bg-slate-50 flex flex-col overflow-hidden" style={{ height: '100dvh' }}>
       <PatientNav />
 
       {/* Header */}
@@ -199,8 +199,8 @@ export default function ChatPage() {
         </div>
       </main>
 
-      {/* Input bar */}
-      <div className="bg-white border-t border-slate-100 px-4 py-3 shrink-0" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+      {/* Input bar — sits above the fixed bottom nav (h-16 = 64px) */}
+      <div className="bg-white border-t border-slate-100 px-4 py-3 shrink-0" style={{ paddingBottom: 'calc(64px + max(8px, env(safe-area-inset-bottom)))' }}>
         <div className="max-w-lg mx-auto flex items-end gap-2">
           <textarea
             ref={textareaRef}
