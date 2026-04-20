@@ -12,17 +12,30 @@ import { AlertBanner } from '../../../components/patient/AlertBanner';
 import { VitalSummary } from '../../../components/patient/VitalSummary';
 
 export default function DashboardPage() {
-  const { user } = useAuthStore();
+  const { user, setUser } = useAuthStore();
   const patientId = user?.patient?.id;
 
+  // If user exists but patient.id is missing (stale localStorage), refresh from /auth/me
+  const { data: freshUser } = useQuery({
+    queryKey: ['auth-me'],
+    queryFn: () => api.get('/auth/me').then(r => r.data.data),
+    enabled: !!user && !patientId,
+    staleTime: Infinity,
+  });
+
+  const resolvedPatientId = patientId ?? freshUser?.patient?.id;
+
+  // Sync fresh user into store so subsequent navigations work
+  if (freshUser && !patientId) setUser(freshUser);
+
   const { data: dashboard, isLoading } = useQuery({
-    queryKey: ['patient-dashboard', patientId],
-    queryFn: () => api.get(`/patients/${patientId}/dashboard`).then(r => r.data.data),
-    enabled: !!patientId,
+    queryKey: ['patient-dashboard', resolvedPatientId],
+    queryFn: () => api.get(`/patients/${resolvedPatientId}/dashboard`).then(r => r.data.data),
+    enabled: !!resolvedPatientId,
     refetchInterval: 5 * 60 * 1000,
   });
 
-  if (isLoading) return <DashboardSkeleton />;
+  if (isLoading || (!resolvedPatientId && !!user)) return <DashboardSkeleton />;
   if (!dashboard) return null;
 
   const { patient, daysPostDischarge, progress, nextModule, alerts, recentVitals, upcomingModules } = dashboard;

@@ -393,6 +393,22 @@ async function main() {
   }
 
   console.log(`\n✓ ${created} modules seeded`);
+
+  // ── Generate learning plan for patient if not already created ──────────────
+  const patientProfile = await prisma.patientProfile.findFirst({
+    where: { user: { email: 'patient@swellnessiq.com' } },
+  });
+  if (patientProfile) {
+    const existingPlan = await prisma.learningPlan.findUnique({ where: { patientId: patientProfile.id } });
+    if (!existingPlan) {
+      const { LearningPlanEngine } = await import('../services/learningPlanEngine');
+      await LearningPlanEngine.generateInitialPlan(patientProfile.id);
+      console.log('✓ Learning plan generated for patient');
+    } else {
+      console.log('✓ Learning plan already exists');
+    }
+  }
+
   console.log('\nAccounts:');
   console.log('  Admin:     admin@swellnessiq.com     / Admin123!');
   console.log('  Navigator: navigator@swellnessiq.com / Nurse123!');

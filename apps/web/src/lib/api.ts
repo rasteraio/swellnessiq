@@ -110,8 +110,16 @@ api.interceptors.response.use(
           `${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`,
           { refreshToken }
         );
-        useAuthStore.getState().setAccessToken(data.data.accessToken);
-        originalRequest.headers.Authorization = `Bearer ${data.data.accessToken}`;
+        const newToken = data.data.accessToken;
+        useAuthStore.getState().setAccessToken(newToken);
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        // Refresh user profile so patient.id and role are always current
+        try {
+          const me = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`, {
+            headers: { Authorization: `Bearer ${newToken}` },
+          });
+          useAuthStore.getState().setUser(me.data.data);
+        } catch {}
         return api(originalRequest);
       } catch {
         useAuthStore.getState().logout();
