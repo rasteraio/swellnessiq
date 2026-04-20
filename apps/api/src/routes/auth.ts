@@ -74,7 +74,11 @@ router.post('/login', authLimiter, async (req: Request, res: Response, next: Nex
 
     const user = await prisma.user.findUnique({
       where: { email },
-      select: { id: true, email: true, passwordHash: true, role: true, isActive: true, firstName: true, lastName: true },
+      select: {
+        id: true, email: true, passwordHash: true, role: true, isActive: true,
+        firstName: true, lastName: true,
+        patient: { select: { id: true, primaryCondition: true, engagementLevel: true, riskScore: true } },
+      },
     });
 
     if (!user || !(await verifyPassword(password, user.passwordHash))) {
@@ -112,7 +116,7 @@ router.post('/login', authLimiter, async (req: Request, res: Response, next: Nex
       data: {
         accessToken,
         refreshToken: refreshTokenSigned,
-        user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role },
+        user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role, patient: user.patient ?? undefined },
       },
     });
   } catch (err) {
